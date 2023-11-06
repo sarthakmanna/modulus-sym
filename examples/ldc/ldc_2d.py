@@ -21,7 +21,7 @@ import modulus.sym
 from modulus.sym.hydra import to_absolute_path, instantiate_arch, ModulusConfig
 from modulus.sym.solver import Solver
 from modulus.sym.domain import Domain
-from modulus.sym.geometry.primitives_2d import Rectangle
+from modulus.sym.geometry.primitives_2d import Rectangle, Circle
 from modulus.sym.domain.constraint import (
     PointwiseBoundaryConstraint,
     PointwiseInteriorConstraint,
@@ -52,8 +52,11 @@ def run(cfg: ModulusConfig) -> None:
     # make geometry
     height = 0.1
     width = 0.1
+    centre = (0, 0)
+    radius = 0.02
     x, y = Symbol("x"), Symbol("y")
     rec = Rectangle((-width / 2, -height / 2), (width / 2, height / 2))
+    cir = Circle(centre, radius)
 
     # make ldc domain
     ldc_domain = Domain()
@@ -79,9 +82,18 @@ def run(cfg: ModulusConfig) -> None:
     )
     ldc_domain.add_constraint(no_slip, "no_slip")
 
+    # obstacle
+    obstacle = PointwiseBoundaryConstraint(
+        nodes=nodes,
+        geometry=cir,
+        outvar={"u": 0, "v": 0},
+        batch_size=cfg.batch_size.Obstacle,
+    )
+    ldc_domain.add_constraint(obstacle, "obstacle")
+
     # interior
     interior = PointwiseInteriorConstraint(
-        nodes=nodes,
+       	nodes=nodes,
         geometry=rec,
         outvar={"continuity": 0, "momentum_x": 0, "momentum_y": 0},
         batch_size=cfg.batch_size.Interior,
@@ -90,6 +102,7 @@ def run(cfg: ModulusConfig) -> None:
             "momentum_x": Symbol("sdf"),
             "momentum_y": Symbol("sdf"),
         },
+        criteria=Symbol('x')**2 + Symbol('y')**2 > radius**2,
     )
     ldc_domain.add_constraint(interior, "interior")
 
